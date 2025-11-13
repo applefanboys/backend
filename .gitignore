@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+
+# IDE / Editor
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Byte-compiled / optimized / DLL files
+*.so
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# FastAPI / Uvicorn
+*.pid
+
+# Cache
+*.cache
+.cache/
