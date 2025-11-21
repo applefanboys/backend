@@ -1,4 +1,4 @@
-from App.Api.naverNewsAPI import fetch_news_today
+from App.api.naverNewsAPI import fetch_news_today
 
 DOMESTIC_KEYWORDS = [
     "코스피",

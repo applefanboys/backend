@@ -1,10 +1,11 @@
-from fastapi import FastAPI
-from App.Router.routes_naverNews import router as news_router
+from fastapi import FastAPI, APIRouter
+from App.router import routes_naverNews, routes_preferences
 
 app = FastAPI(title="News API Server")
 
 # 라우터 등록
-app.include_router(news_router)
+app.include_router(routes_naverNews.router)
+app.include_router(routes_preferences.router)
 
 @app.get("/")
 async def root():

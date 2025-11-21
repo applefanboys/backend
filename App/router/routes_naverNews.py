@@ -1,7 +1,7 @@
 from fastapi import APIRouter
-from App.Service.naverNewsService import get_today_economy_news
+from App.service.naverNewsService import get_today_economy_news
 
-router = APIRouter(prefix="/news", tags=["news"])
+router = APIRouter(prefix="/api/news", tags=["news"])
 
 @router.get("/today")
 def read_today_news():
