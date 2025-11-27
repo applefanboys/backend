@@ -1,134 +1,191 @@
 import os
-import requests
+import json
 from fastapi import FastAPI, HTTPException
-from gtts import gTTS
-from fastapi.responses import FileResponse, JSONResponse
-import openai
+import google.generativeai as genai
+import FinanceDataReader as fdr
+from datetime import datetime, timedelta
+import random
 
 from pydantic import BaseModel
 from typing import List
 
 
-class SummaryRequest(BaseModel):
-    text: str
+# --- 데이터 모델 ---
+class OnboardingQ1Request(BaseModel):
+    categories: List[str]
 
 
-class KeywordsRequest(BaseModel):
+class OnboardingQ2Request(BaseModel):
+    keywords: List[str]
+
+
+class OnboardingQ3Request(BaseModel):
     keywords: List[str]
 
 
 app = FastAPI()
 
-# --- API 키들 ---
-NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
-NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if OPENAI_API_KEY:
-    openai.api_key = OPENAI_API_KEY
+# --- API 키 설정 ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-temp_user_keywords = ["경제"]
+# [핵심] 스마트 모델 선택기
+# 사용 가능한 모델을 찾아서 전역 변수에 저장해둡니다.
+CURRENT_MODEL_NAME = "gemini-1.5-flash"  # 기본값 (실패 시 대비)
 
-
-# --- [NEW!] "뉴스 요약(description)을 TTS로 바로 변환"하는 API ---
-@app.get("/api/shortform/top-news")
-async def get_top_news_tts(query: str = "경제"):
-    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="서버에 네이버 API 키가 설정되지 않았습니다.")
-
-    # 1. 네이버 API로 뉴스 1개 가져오기
-    news_json = await get_naver_news_internal(query, 1)  # 내부 함수 호출
-
-    if not news_json.get("items"):
-        raise HTTPException(status_code=404, detail="뉴스를 찾을 수 없습니다.")
-
-    # 2. 첫 번째 뉴스의 'description'(요약)을 꺼냄
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
     try:
-        top_news_description = news_json["items"][0]["description"]
+        # 사용 가능한 모델 목록 조회 (generateContent 지원하는 모델만)
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        print(f"📋 사용 가능 모델 목록: {available_models}")
 
-        # HTML 태그 제거 (<b>, </b> 같은 거)
-        top_news_description = top_news_description.replace("<b>", "").replace("</b>", "")
-        print(f"TTS로 변환할 텍스트: {top_news_description}")
+        # 우선순위: 1.5-flash -> pro -> 아무거나
+        # 모델명은 보통 'models/gemini-1.5-flash' 형태이므로 'gemini-1.5-flash'만 추출하거나 그대로 사용
+        if any('gemini-1.5-flash' in m for m in available_models):
+            # 리스트에서 정확한 이름 찾기
+            CURRENT_MODEL_NAME = next(m for m in available_models if 'gemini-1.5-flash' in m)
+        elif any('gemini-pro' in m for m in available_models):
+            CURRENT_MODEL_NAME = next(m for m in available_models if 'gemini-pro' in m)
+        elif available_models:
+            CURRENT_MODEL_NAME = available_models[0]
 
-    except (IndexError, KeyError):
-        raise HTTPException(status_code=500, detail="뉴스 요약(description)을 추출하는데 실패했습니다.")
+        # 'models/' 접두사가 있으면 제거 (라이브러리 버전에 따라 필요할 수도 있음)
+        # 하지만 보통 full name을 써도 됨. 여기선 안전하게 감지된 이름 그대로 사용.
+        print(f"🚀 최종 선택된 모델: {CURRENT_MODEL_NAME}")
 
-    # 3. gTTS로 mp3 파일 생성
-    try:
-        tts = gTTS(text=top_news_description, lang='ko')
-        file_path = "temp_news_tts.mp3"
-        tts.save(file_path)
-
-        # 4. mp3 파일 바로 반환
-        return FileResponse(path=file_path, media_type='audio/mpeg', filename='news_tts.mp3')
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"gTTS 변환 실패: {e}")
+        print(f"⚠️ 모델 목록 조회 실패 (기본값 {CURRENT_MODEL_NAME} 사용): {e}")
+
+# --- [메모리 저장소] ---
+user_data = {
+    "categories": ["전체 경제"],
+    "keywords": [],
+    "excluded": []
+}
 
 
-# --- 네이버 뉴스 API (내부 호출용 함수로 분리) ---
-NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
+# ==========================================
+# 1. 온보딩 API
+# ==========================================
+@app.post("/api/onboarding/q1")
+async def save_q1_categories(req: OnboardingQ1Request):
+    user_data["categories"] = req.categories
+    return {"message": "Q1 저장 완료", "data": user_data["categories"]}
 
 
-async def get_naver_news_internal(query: str, display: int):
-    headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    params = {"query": query, "display": display, "sort": "sim"}
+@app.post("/api/onboarding/q2")
+async def save_q2_keywords(req: OnboardingQ2Request):
+    user_data["keywords"] = req.keywords
+    return {"message": "Q2 저장 완료", "data": user_data["keywords"]}
+
+
+@app.post("/api/onboarding/q3")
+async def save_q3_excluded(req: OnboardingQ3Request):
+    user_data["excluded"] = req.keywords
+    return {"message": "Q3 저장 완료", "data": user_data["excluded"]}
+
+
+# ==========================================
+# 2. 개인화 AI 주식 추천 API
+# ==========================================
+@app.get("/api/stocks/recommend/personal")
+async def recommend_personal_stock():
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="Gemini API KEY 없음")
+
     try:
-        response = requests.get(NAVER_NEWS_URL, headers=headers, params=params)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"네이버 API 호출 실패: {e}")
+        # 1. 추천 주제 선정
+        target_topic = "경제"
+        if user_data["keywords"]:
+            target_topic = random.choice(user_data["keywords"])
+        elif user_data["categories"]:
+            target_topic = random.choice(user_data["categories"])
 
+        excluded_str = ", ".join(user_data["excluded"]) if user_data["excluded"] else "없음"
 
-@app.get("/api/news/major")
-async def get_major_news(query: str = "경제"):
-    # (이제는 내부 함수를 호출해서 10개 가져옴)
-    return await get_naver_news_internal(query, 10)
+        # 2. AI에게 종목 물어보기 (자동 선택된 모델 사용)
+        # [수정: 전역 변수 CURRENT_MODEL_NAME 사용]
+        model = genai.GenerativeModel(CURRENT_MODEL_NAME)
 
+        search_prompt = f"""
+        사용자는 '{target_topic}' 분야에 관심이 있어.
+        단, '{excluded_str}'와 관련된 종목은 절대 추천하지 마.
+        한국 주식 시장(KRX)에서 '{target_topic}'와 가장 관련성이 높은 대장주 3개만 찾아줘.
 
-# --- [OLD] 키워드 저장/조회 API ---
-@app.post("/api/user/keywords")
-async def save_user_keywords(request_body: KeywordsRequest):
-    global temp_user_keywords
-    temp_user_keywords = request_body.keywords
-    return {"message": "키워드 저장 성공", "saved_keywords": temp_user_keywords}
+        반드시 아래 JSON 형식으로만 대답해. (마크다운 없이 순수 JSON만)
+        [
+            {{"name": "종목명", "code": "종목코드(6자리숫자)"}},
+            {{"name": "종목명", "code": "종목코드(6자리숫자)"}},
+            {{"name": "종목명", "code": "종목코드(6자리숫자)"}}
+        ]
+        """
 
+        search_resp = model.generate_content(search_prompt)
+        cleaned_search = search_resp.text.replace("```json", "").replace("```", "").strip()
 
-@app.get("/api/user/keywords")
-async def get_user_keywords():
-    return {"keywords": temp_user_keywords}
+        try:
+            candidates = json.loads(cleaned_search)
+        except:
+            candidates = [{"name": "KODEX 200", "code": "069500"}]  # 실패시 기본값
 
+        print(f"AI 후보: {candidates}")
 
-# --- [OLD] OpenAI 요약 API ---
-@app.post("/api/summary")
-async def get_summary(request_body: SummaryRequest):
-    # (코드는 이전과 동일... 생략)
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="서버에 OpenAI API 키가 설정되지 않았습니다.")
-    try:
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        completion = client.chat.completions.create(model="gpt-3.5-turbo", messages=[
-            {"role": "system", "content": "너는 뉴스 기사를 3문장으로 요약해주는 전문 요약 봇이야."},
-            {"role": "user", "content": request_body.text}])
-        summary_text = completion.choices[0].message.content
-        return {"summary": summary_text}
+        # 3. 데이터 수집
+        candidates_data_str = ""
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=14)
+        valid_candidates = []
+
+        for stock in candidates:
+            try:
+                # 코드 문자열 처리 강화
+                code = str(stock.get("code", "")).zfill(6)
+                name = stock.get("name", "Unknown")
+
+                df = fdr.DataReader(code, start_date, end_date)
+                if not df.empty:
+                    start = int(df.iloc[0]['Close'])
+                    end = int(df.iloc[-1]['Close'])
+                    change = ((end - start) / start) * 100
+                    candidates_data_str += f"- {name}({code}): {change:.2f}% 변동\n"
+                    valid_candidates.append(name)
+            except:
+                continue
+
+        if not valid_candidates:
+            return {"message": "데이터 조회 실패", "ai_result": "분석할 종목을 찾지 못했습니다."}
+
+        # 4. 최종 분석
+        analyze_prompt = f"""
+        너는 주식 전문가야. 주제: '{target_topic}'
+        후보 데이터:
+        {candidates_data_str}
+
+        이 중 가장 투자 매력도가 높은 종목 1개를 추천해줘.
+
+        반드시 아래 JSON 형식으로만 대답해. (마크다운 없이 순수 JSON만)
+        {{
+            "recommended_stock": "종목명",
+            "stock_code": "종목코드",
+            "reason": "추천 이유..."
+        }}
+        """
+
+        final_resp = model.generate_content(analyze_prompt)
+        cleaned_final = final_resp.text.replace("```json", "").replace("```", "").strip()
+
+        return {
+            "user_interest": target_topic,
+            "candidates_found": valid_candidates,
+            "ai_result": cleaned_final
+        }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI API 호출 실패: {e}")
+        print(f"에러 발생: {e}")
+        # 에러 내용을 자세히 보여줌
+        raise HTTPException(status_code=500, detail=f"서버 에러: {str(e)}")
 
 
-# --- [OLD] TTS 기능 API ---
-@app.get("/api/tts")
-async def get_tts(text: str = "텍스트를 입력하세요"):
-    # (코드는 이전과 동일... 생략)
-    try:
-        tts = gTTS(text=text, lang='ko')
-        file_path = "temp_audio.mp3"
-        tts.save(file_path)
-        return FileResponse(path=file_path, media_type='audio/mpeg', filename='speech.mp3')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"TTS 생성 실패: {e}")
-
-
-# --- [OLD] 서버 생존 확인용 ---
 @app.get("/")
 async def read_root():
-    return {"message": "최종 PoC 서버 (뉴스+TTS+요약+키워드+숏폼) 실행 중입니다."}
+    return {"message": f"서버 실행 중 (모델: {CURRENT_MODEL_NAME})"}

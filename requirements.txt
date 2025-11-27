@@ -1,5 +1,7 @@
 fastapi
 uvicorn[standard]
 requests
-gtts
-openai
+google-generativeai>=0.7.2
+finance-datareader
+pandas
+lxml
