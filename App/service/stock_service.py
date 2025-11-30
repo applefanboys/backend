@@ -9,7 +9,7 @@ import FinanceDataReader as fdr
 
 class StockService:
     def __init__(self):
-        # 👇 여기에 팀장님 키(sk-...)를 꼭 다시 넣으세요!
+        # 👇 네가 준 원본 키 그대로 유지
         self.api_key = "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"
 
         if self.api_key and len(self.api_key) > 10:
@@ -25,19 +25,26 @@ class StockService:
         print("🚀 [디버깅] 주식 추천 로직 시작")
 
         try:
-            # 1. 주제 선정
-            target_topic = "경제"
-            if user_data.get("keywords"):
-                target_topic = random.choice(user_data["keywords"])
-            elif user_data.get("categories"):
-                target_topic = random.choice(user_data["categories"])
+            # 1. 주제 선정 (Q2 키워드 우선순위 로직)
+            keywords = user_data.get("keywords", [])
+            categories = user_data.get("categories", [])
+            excluded_list = user_data.get("excluded", [])  # 제외 키워드
 
-            # [추가] 제외 키워드 목록 가져오기
-            excluded_list = user_data.get("excluded", [])
-            print(f"🎯 주제: {target_topic}")
+            target_topic = "경제"
+            source = "기본값"
+
+            # 🔥 [수정] 키워드가 있으면 무조건 키워드 사용, 없으면 카테고리
+            if keywords and len(keywords) > 0:
+                target_topic = random.choice(keywords)
+                source = "Q2(키워드)"
+            elif categories and len(categories) > 0:
+                target_topic = random.choice(categories)
+                source = "Q1(카테고리)"
+
+            print(f"🎯 주제: {target_topic} (출처: {source})")
             print(f"🚫 제외할 키워드: {excluded_list}")
 
-            # 2. OpenAI 1차 질문 (프롬프트 강화)
+            # 2. OpenAI 1차 질문 (프롬프트에 제외 조건 추가)
             search_prompt = f"""
             한국 주식 시장에서 '{target_topic}' 관련 대장주 3개만 JSON으로 알려줘.
 
@@ -68,6 +75,7 @@ class StockService:
                 candidates = json.loads(cleaned_search)
                 print(f"📋 AI 원본 응답 파싱: {candidates}")
 
+                # [안전장치 1] 딕셔너리 처리
                 if isinstance(candidates, dict):
                     print("⚠️ 딕셔너리가 감지됨! 내부 리스트 탐색 중...")
                     for key, value in candidates.items():
@@ -103,11 +111,11 @@ class StockService:
                     else:
                         continue
 
-                    # 🔥 [핵심 추가] 파이썬 레벨에서 강제로 쳐내기 🔥
-                    # 제외 키워드가 종목 이름에 포함되어 있으면, 데이터 수집도 안 하고 바로 버림!
+                    # 🔥 [수정] 파이썬 레벨에서 강제 필터링 추가
+                    # 제외 키워드가 종목명에 포함되면 데이터 수집 안 함
                     is_excluded = False
                     for ex_word in excluded_list:
-                        if ex_word in name:
+                        if ex_word.replace(" ", "") in name.replace(" ", ""):
                             print(f"   🚫 [필터링 작동] 제외 키워드 '{ex_word}' 감지됨: {name} -> 탈락!")
                             is_excluded = True
                             break
@@ -175,6 +183,7 @@ class StockService:
 
             return {
                 "user_interest": target_topic,
+                "source": source,  # 프론트엔드 확인용
                 "candidates_found": valid_candidates,
                 "ai_result": final_json
             }
