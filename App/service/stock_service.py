@@ -32,11 +32,17 @@ class StockService:
             elif user_data.get("categories"):
                 target_topic = random.choice(user_data["categories"])
 
+            # [추가] 제외 키워드 목록 가져오기
+            excluded_list = user_data.get("excluded", [])
             print(f"🎯 주제: {target_topic}")
+            print(f"🚫 제외할 키워드: {excluded_list}")
 
             # 2. OpenAI 1차 질문 (프롬프트 강화)
             search_prompt = f"""
             한국 주식 시장에서 '{target_topic}' 관련 대장주 3개만 JSON으로 알려줘.
+
+            [제외 조건]
+            {excluded_list} 이 키워드들과 관련된 종목은 절대 추천하지 마.
 
             [중요]
             1. 무조건 리스트([]) 형태로만 대답해. 딕셔너리 key 쓰지 마.
@@ -52,7 +58,7 @@ class StockService:
                     {"role": "system", "content": "JSON 형식으로만 대답해."},
                     {"role": "user", "content": search_prompt}
                 ],
-                temperature=0.3  # 창의성 좀 낮춰서 형식 잘 지키게 함
+                temperature=0.3
             )
 
             ai_text = response.choices[0].message.content
@@ -62,7 +68,6 @@ class StockService:
                 candidates = json.loads(cleaned_search)
                 print(f"📋 AI 원본 응답 파싱: {candidates}")
 
-                # 🔥 [안전장치 1] AI가 딕셔너리로 감싸서 줬을 경우 (예: {'stocks': [...]})
                 if isinstance(candidates, dict):
                     print("⚠️ 딕셔너리가 감지됨! 내부 리스트 탐색 중...")
                     for key, value in candidates.items():
@@ -71,14 +76,13 @@ class StockService:
                             print(f"   -> 리스트 발견! ({key})")
                             break
                     else:
-                        # 리스트 못 찾았으면 강제로 1개라도 만듦
                         candidates = [candidates]
 
             except:
                 print(f"⚠️ JSON 파싱 실패, 기본값 사용")
                 candidates = [{"name": "KODEX 200", "code": "069500"}]
 
-            # 3. 데이터 수집
+            # 3. 데이터 수집 및 [강력 필터링]
             candidates_data_str = ""
             end_date = datetime.now()
             start_date = end_date - timedelta(days=14)
@@ -90,16 +94,25 @@ class StockService:
 
                 try:
                     if isinstance(stock, dict):
-                        # 🔥 [안전장치 2] 한글/영어 키 모두 지원
                         code = str(stock.get("code") or stock.get("코드") or "").zfill(6)
                         name = stock.get("name") or stock.get("이름") or "Unknown"
 
-                        # 코드가 없으면 패스
                         if code == "000000" or not code:
                             print(f"   ⚠️ 종목 코드 없음: {stock}")
                             continue
                     else:
-                        print(f"   ⚠️ 데이터 형식이 이상함: {stock}")
+                        continue
+
+                    # 🔥 [핵심 추가] 파이썬 레벨에서 강제로 쳐내기 🔥
+                    # 제외 키워드가 종목 이름에 포함되어 있으면, 데이터 수집도 안 하고 바로 버림!
+                    is_excluded = False
+                    for ex_word in excluded_list:
+                        if ex_word in name:
+                            print(f"   🚫 [필터링 작동] 제외 키워드 '{ex_word}' 감지됨: {name} -> 탈락!")
+                            is_excluded = True
+                            break
+
+                    if is_excluded:
                         continue
 
                     print(f"   Running FDR... {name}({code})")
@@ -126,7 +139,7 @@ class StockService:
                     "ai_result": {
                         "recommended_stock": "추천 불가",
                         "stock_code": "",
-                        "reason": "AI가 찾은 종목들의 데이터를 불러올 수 없습니다."
+                        "reason": f"제외 키워드({excluded_list})로 인해 모든 후보가 필터링되었습니다."
                     }
                 }
 
