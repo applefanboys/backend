@@ -1,9 +1,9 @@
+# App/user/service.py
 import uuid
 from sqlalchemy.orm import Session
 from App.user import models, schemas
 from App.core.security import get_password_hash, verify_password
 
-# 회원가입 (기존과 동일)
 def create_user(db: Session, user_in: schemas.UserCreate) -> models.User:
     existing = db.query(models.User).filter(models.User.email == user_in.email).first()
     if existing:
@@ -20,7 +20,6 @@ def create_user(db: Session, user_in: schemas.UserCreate) -> models.User:
     db.refresh(user)
     return user
 
-# 로그인 인증 (기존과 동일)
 def authenticate_user(db: Session, email: str, password: str):
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
@@ -29,17 +28,24 @@ def authenticate_user(db: Session, email: str, password: str):
         return None
     return user
 
-# [추가됨] 일반 토큰 생성 및 저장
 def create_general_token(db: Session, user_id: int) -> str:
-    # 1. 랜덤 문자열(UUID) 생성
     random_token = str(uuid.uuid4())
-    
-    # 2. DB에 저장
-    db_token = models.UserToken(
-        token=random_token,
-        user_id=user_id
-    )
+    db_token = models.UserToken(token=random_token, user_id=user_id)
     db.add(db_token)
     db.commit()
-    
     return random_token
+
+# ✅ [수정됨] 토큰 검증 없이 바로 비밀번호 변경
+def update_password(db: Session, email: str, new_password: str):
+    # 1. 유저 확인
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise ValueError("가입되지 않은 이메일입니다.")
+
+    # 2. 비밀번호 암호화 및 업데이트
+    user.password_hash = get_password_hash(new_password)
+    
+    # 3. 저장
+    db.commit()
+    db.refresh(user)
+    return user
