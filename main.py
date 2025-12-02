@@ -7,6 +7,7 @@ from App.user import models as user_models
 from App.router import routes_naverNews, routes_preferences, routes_fortune, routes_password_reset, routes_keyword
 from App.user.routes import router as auth_router
 from App.ai_news.router import router as news_router
+from App.tts.routes import router as tts_router
 
 app = FastAPI(title="News API Server")
 
@@ -18,6 +19,7 @@ app.include_router(routes_password_reset.router)
 app.include_router(auth_router)
 app.include_router(news_router)
 app.include_router(routes_keyword.router)
+app.include_router(tts_router)
 
 # 테이블 생성
 # user_models.User.metadata.create_all(bind=engine)
