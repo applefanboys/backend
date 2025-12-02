@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 from App.core.database import get_db
 from App.user.models import UserOnBoarding
@@ -6,6 +6,17 @@ from App.user.models import UserOnBoarding
 class PreferenceRepository:
     def __init__(self, db: Session):
         self.db = db
+
+    def get_onboarding(self, user_id: int) -> Optional[UserOnBoarding]:
+        """
+        해당 유저의 온보딩 레코드를 하나 가져온다.
+        없으면 None 리턴.
+        """
+        return (
+            self.db.query(UserOnBoarding)
+            .filter(UserOnBoarding.user_id == user_id)
+            .first()
+        )
 
     # ---------- Q1 ----------
     def save_q1_selection(self, user_id: int, selected_ids: List[int]) -> None:
