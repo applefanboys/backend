@@ -9,4 +9,7 @@ passlib[bcrypt]
 email-validator
 cryptography
 python-dateutil
+finance-datareader
+pandas
+lxml
 openai>=1.0.0

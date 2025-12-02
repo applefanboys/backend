@@ -3,19 +3,20 @@ import json
 import random
 import traceback
 from datetime import datetime, timedelta
+
 from openai import OpenAI
 import FinanceDataReader as fdr
 
 
 class StockService:
     def __init__(self):
-        # 👇 네가 준 원본 키 그대로 유지
-        self.api_key = "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"
+        # 🔒 환경변수에서 API 키 읽기 (하드코딩 지양)
+        self.api_key = os.getenv("OPENAI_API_KEY")
 
         if self.api_key and len(self.api_key) > 10:
             print(f"🔑 API 키 장전 완료: {self.api_key[:5]}...")
         else:
-            print("❌ API 키가 없거나 너무 짧습니다!")
+            print("❌ OPENAI_API_KEY 환경변수가 설정되지 않았습니다!")
 
         self.client = OpenAI(api_key=self.api_key)
         self.model_name = "gpt-4o-mini"
@@ -33,18 +34,18 @@ class StockService:
             target_topic = "경제"
             source = "기본값"
 
-            # 🔥 [수정] 키워드가 있으면 무조건 키워드 사용, 없으면 카테고리
-            if keywords and len(keywords) > 0:
+            # 🔥 키워드가 있으면 키워드 우선, 없으면 카테고리
+            if keywords:
                 target_topic = random.choice(keywords)
                 source = "Q2(키워드)"
-            elif categories and len(categories) > 0:
+            elif categories:
                 target_topic = random.choice(categories)
                 source = "Q1(카테고리)"
 
             print(f"🎯 주제: {target_topic} (출처: {source})")
             print(f"🚫 제외할 키워드: {excluded_list}")
 
-            # 2. OpenAI 1차 질문 (프롬프트에 제외 조건 추가)
+            # 2. OpenAI 1차 질문
             search_prompt = f"""
             한국 주식 시장에서 '{target_topic}' 관련 대장주 3개만 JSON으로 알려줘.
 
@@ -75,7 +76,7 @@ class StockService:
                 candidates = json.loads(cleaned_search)
                 print(f"📋 AI 원본 응답 파싱: {candidates}")
 
-                # [안전장치 1] 딕셔너리 처리
+                # 딕셔너리로 온 경우 방어
                 if isinstance(candidates, dict):
                     print("⚠️ 딕셔너리가 감지됨! 내부 리스트 탐색 중...")
                     for key, value in candidates.items():
@@ -86,11 +87,11 @@ class StockService:
                     else:
                         candidates = [candidates]
 
-            except:
+            except Exception:
                 print(f"⚠️ JSON 파싱 실패, 기본값 사용")
                 candidates = [{"name": "KODEX 200", "code": "069500"}]
 
-            # 3. 데이터 수집 및 [강력 필터링]
+            # 3. 데이터 수집 + 제외 키워드 강제 필터링
             candidates_data_str = ""
             end_date = datetime.now()
             start_date = end_date - timedelta(days=14)
@@ -111,8 +112,7 @@ class StockService:
                     else:
                         continue
 
-                    # 🔥 [수정] 파이썬 레벨에서 강제 필터링 추가
-                    # 제외 키워드가 종목명에 포함되면 데이터 수집 안 함
+                    # 제외 키워드 Python 레벨에서도 필터링
                     is_excluded = False
                     for ex_word in excluded_list:
                         if ex_word.replace(" ", "") in name.replace(" ", ""):
@@ -143,6 +143,7 @@ class StockService:
                 print("🚨 유효한 종목 없음 -> 분석 중단")
                 return {
                     "user_interest": target_topic,
+                    "source": source,
                     "candidates_found": [],
                     "ai_result": {
                         "recommended_stock": "추천 불가",
@@ -183,7 +184,7 @@ class StockService:
 
             return {
                 "user_interest": target_topic,
-                "source": source,  # 프론트엔드 확인용
+                "source": source,  # 프론트 확인용
                 "candidates_found": valid_candidates,
                 "ai_result": final_json
             }
