@@ -8,4 +8,5 @@ pymysql
 passlib[bcrypt]
 email-validator
 cryptography
+python-dateutil
 openai>=1.0.0

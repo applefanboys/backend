@@ -1,4 +1,3 @@
-# App/news/router.py
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
@@ -8,11 +7,12 @@ from App.user.models import User  # 기존 User 모델
 from .schemas import PersonalizedNewsResponse
 from .aiNews_service import build_user_keywords
 from .recommendService import get_personalized_articles
+from App.user.deps import get_current_user
 
 router = APIRouter(prefix="/api/news", tags=["news"])
 
 
-@router.get("/api/ai_news/personalized", response_model=PersonalizedNewsResponse)
+@router.get("/personalized", response_model=PersonalizedNewsResponse)
 def get_personalized_news(
     days: int = Query(3, ge=1, le=7, description="최근 N일"),
     limit: int = Query(20, ge=1, le=50),

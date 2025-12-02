@@ -1,4 +1,4 @@
-from App.api.naverNewsAPI import fetch_news_today
+from App.api.naverNewsAPI import fetch_naver_news_recent
 
 DOMESTIC_KEYWORDS = [
     "코스피",
@@ -34,7 +34,7 @@ def get_today_news():
 
     # 키워드별로 따로 호출해서 결과를 쌓음 (사실상 OR 효과)
     for kw in ALL_KEYWORDS:
-        rows = fetch_news_today(kw, max_pages=1, display=20)
+        rows = fetch_naver_news_recent(kw, max_pages=1, display=20)
         all_results.extend(rows)
 
     # 중복 제거 (origin_url 우선, 없으면 url)
