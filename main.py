@@ -4,7 +4,7 @@ import sqlalchemy.exc
 from fastapi import FastAPI, APIRouter
 from App.core.database import Base, engine
 from App.user import models as user_models
-from App.router import routes_naverNews, routes_preferences, routes_fortune, routes_password_reset
+from App.router import routes_naverNews, routes_preferences, routes_fortune, routes_password_reset, routes_keyword
 from App.user.routes import router as auth_router
 from App.ai_news.router import router as news_router
 
@@ -17,6 +17,7 @@ app.include_router(routes_fortune.router)
 app.include_router(routes_password_reset.router)
 app.include_router(auth_router)
 app.include_router(news_router)
+app.include_router(routes_keyword.router)
 
 # 테이블 생성
 # user_models.User.metadata.create_all(bind=engine)
