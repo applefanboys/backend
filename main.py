@@ -4,7 +4,9 @@ import sqlalchemy.exc
 from fastapi import FastAPI, APIRouter
 from App.core.database import Base, engine
 from App.user import models as user_models
-from App.router import routes_naverNews, routes_preferences, routes_fortune, routes_password_reset, routes_keyword
+
+# [수정] 여기에 routes_feed를 추가했습니다.
+from App.router import routes_naverNews, routes_preferences, routes_fortune, routes_password_reset, routes_keyword, routes_feed
 from App.user.routes import router as auth_router
 from App.ai_news.router import router as news_router
 from App.tts.routes import router as tts_router
@@ -23,6 +25,9 @@ app.include_router(news_router)
 app.include_router(routes_keyword.router)
 app.include_router(tts_router)
 app.include_router(stock_router)
+
+# [수정] 메인 피드(AI 뉴스 포함) 라우터를 등록합니다.
+app.include_router(routes_feed.router)
 
 # 테이블 생성
 # user_models.User.metadata.create_all(bind=engine)

@@ -2,10 +2,10 @@ from typing import List
 from pydantic import BaseModel
 
 class Category(BaseModel):
-    id: int     # 1 ~ 8
-    key: str    # 내부용 키
-    label: str  # 표시 이름
-    description: str    # 설명
+    id: int
+    key: str
+    label: str
+    description: str
 
 # ---------- Q1: 관심 분야 선택 ----------
 
@@ -15,9 +15,7 @@ class Q1CategoriesResponse(BaseModel):
 
 # Q1 답변 요청 (POST)
 class Q1AnswerRequest(BaseModel):
-    # 나중에 로그인 붙으면 user_id는 토큰에서 꺼낼 거라서,
-    # 지금은 프론트에서 user_id 안 보내도 되게 해둠.
-    selected_category_ids: List[int] # 1~3개 선택
+    selected_category_ids: List[int]
 
 # Q1 답변 응답 (POST)
 class Q1AnswerResponse(BaseModel):
@@ -26,7 +24,6 @@ class Q1AnswerResponse(BaseModel):
 # ---------- Q2: 선호 키워드 (보고 싶은 것) ----------
 
 class Q2AnswerRequest(BaseModel):
-    # 예 : ["반도체", "2차전지", "엔비디아"]
     keywords: List[str]
 
 class Q2AnswerResponse(BaseModel):
@@ -34,7 +31,6 @@ class Q2AnswerResponse(BaseModel):
 
 # ---------- Q3: 제외 키워드 (보고 싶지 않은 것) ----------
 class Q3AnswerRequest(BaseModel):
-    # 예 : ["코인", "부동산"]
     exclude_keywords: List[str]
 
 class Q3AnswerResponse(BaseModel):
@@ -46,3 +42,9 @@ class OnboardingStatus(BaseModel):
     q1_completed: bool
     q2_completed: bool
     q3_completed: bool
+
+# ---------- [NEW] 안드로이드 완료 버튼용 통합 요청 모델 ----------
+class OnboardingCompleteRequest(BaseModel):
+    q1_text: str               # 안드로이드에서 보낸 관심 뉴스 유형 (텍스트)
+    include_keywords: List[str] # 포함할 키워드 리스트
+    exclude_keywords: List[str] # 제외할 키워드 리스트
