@@ -10,13 +10,9 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 
 FROM_NAME = "숏뉴스" # 서비스 이름
 
-# 앱 딥링크 스킴을 사용하는 걸로 변경함.(기존엔 웹)
-APP_DEEPLINK_SCHEME = os.getenv("APP_DEEPLINK_SCHEME", "shortnews")
-APP_DEEPLINK_HOST = os.getenv("APP_DEEPLINK_HOST", "reset-password")
-
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://short-economy.store")
 def send_password_reset_email(to_email: str, token: str):
-    # shortnews://reset-password?token=xxxx 형태
-    reset_link = f"{APP_DEEPLINK_SCHEME}://{APP_DEEPLINK_HOST}?token={token}"
+    reset_link = f"{FRONTEND_BASE_URL}/reset-password?token={token}"
 
     subject = "[숏뉴스] 비밀번호 재설정 링크 안내"
     body = f"""
