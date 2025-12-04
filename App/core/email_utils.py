@@ -16,7 +16,7 @@ APP_DEEPLINK_HOST = os.getenv("APP_DEEPLINK_HOST", "reset-password")
 
 def send_password_reset_email(to_email: str, token: str):
     # shortnews://reset-password?token=xxxx 형태
-    reset_link = f"{APP_DEEPLINK_SCHEME}{APP_DEEPLINK_HOST}?token={token}"
+    reset_link = f"{APP_DEEPLINK_SCHEME}://{APP_DEEPLINK_HOST}?token={token}"
 
     subject = "[숏뉴스] 비밀번호 재설정 링크 안내"
     body = f"""
