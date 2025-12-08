@@ -11,7 +11,8 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 FROM_NAME = "숏뉴스" # 서비스 이름
 
 def send_password_reset_email(to_email: str, token: str):
-    reset_link = f"shorteconomy://reset-password?token={token}"
+    server_domain = "https://api.short-economy.store"
+    reset_link = f"{server_domain}/reset-password-open?token={token}"
 
     subject = "[숏뉴스] 비밀번호 재설정 링크 안내"
     body = f"""
