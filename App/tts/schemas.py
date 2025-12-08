@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 class ShortformTTSRequest(BaseModel):
@@ -10,6 +12,9 @@ class ShortformTTSRequest(BaseModel):
 
     # 필요하면 조절 가능(글자수 기준, 10~30초용 대략)
     max_chars: int = 180
+
+    origin_url: Optional[str] = None
+    image_url: Optional[str] = None
 
     # 추후 감정/톤 조절하고 싶으면 이런 필드도 추가 가능
     # style: str | None = None

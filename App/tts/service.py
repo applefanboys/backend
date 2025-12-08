@@ -5,6 +5,7 @@ import random
 import json
 from typing import Generator, List, Tuple
 
+from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 from openai import OpenAI
 import requests
@@ -199,6 +200,7 @@ def build_personalized_news_text(db: Session, user_id: int) -> str:
     if not articles:
         raise ValueError("사용자 선호에 맞는 뉴스를 찾지 못했습니다.")
 
+    # 기사 하나 선택
     selected = random.choice(articles)
 
     title = selected.get("title", "")
@@ -209,10 +211,39 @@ def build_personalized_news_text(db: Session, user_id: int) -> str:
         title = title.replace(ch, "")
         desc = desc.replace(ch, "")
 
+    # OG 이미지 URL 추출
+    image_url = None
+    if origin_link:
+        image_url = extract_og_image(origin_link)
+
     base_text = f"""
 제목: {title}
 내용: {desc}
 
 (출처: 네이버 뉴스, 원문 링크: {origin_link})
-"""
-    return base_text.strip()
+""".strip()
+
+    return {
+        "base_text": base_text,  # TTS 스크립트 생성에 쓸 원본 텍스트
+        "title": title,
+        "description": desc,
+        "origin_link": origin_link,
+        "image_url": image_url,  # 프론트에서 썸네일로 쓰면 됨
+    }
+
+# OG 이미지 추출 함수 만들기
+def extract_og_image(url: str) -> str | None:
+    try:
+        resp = requests.get(url, timeout=2)
+        if resp.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(resp.content, "html.parser")
+        tag = soup.find("meta", property="og:image")
+        if tag and tag.get("content"):
+            return tag["content"]
+
+    except Exception:
+        return None
+
+    return None
