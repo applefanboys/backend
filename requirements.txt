@@ -12,4 +12,5 @@ python-dateutil
 finance-datareader
 pandas
 lxml
+python-multipart
 openai>=1.0.0
