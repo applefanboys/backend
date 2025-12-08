@@ -12,7 +12,7 @@ FROM_NAME = "숏뉴스" # 서비스 이름
 
 def send_password_reset_email(to_email: str, token: str):
     server_domain = "https://api.short-economy.store"
-    reset_link = f"{server_domain}/reset-password-open?token={token}"
+    reset_link = f"{server_domain}/api/user/reset-password-open?token={token}"
 
     subject = "[숏뉴스] 비밀번호 재설정 링크 안내"
     body = f"""
